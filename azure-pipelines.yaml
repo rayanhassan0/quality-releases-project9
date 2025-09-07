@@ -51,11 +51,12 @@ stages:
         #backendServiceArm: 'myServiceConnection-sp1'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
         backendServiceArm: '$(azureServiceConnectionId)'
+        backendAzureRmAccessKey: 'XzHLxUBOov7hoWUr6skzLAym83gOsCWjiH+ImVKAp56ti7uDKKw5XccWZo3LQwAfu20wMbkzrc8a+ASt8Ucu7w=='
         backendAzureRmResourceGroupName: 'Azuredevops1-test'
         backendAzureRmStorageAccountName: 'tfstateacct2025new'
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: 'test.terraform.tfstate'
-        #backendAzureRmUseOidc: true
+        backendAzureRmUseOidc: false
         backendAzureRmUseMsi: false
 
         
@@ -261,6 +262,7 @@ stages:
                 python3 add_remove_from_cart.py >> selenium.log
 
                 echo "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
