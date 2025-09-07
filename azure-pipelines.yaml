@@ -44,13 +44,15 @@ stages:
       inputs:
         provider: 'azurerm'
         command: 'init'
+        backendServiceArm: 'myServiceConnection'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
-        backendServiceArm: '$(azureServiceConnectionId)'
+        #backendServiceArm: '$(azureServiceConnectionId)'
         backendAzureRmResourceGroupName: 'Azuredevops1-test'
         backendAzureRmStorageAccountName: 'tfstateacct2025new'
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: 'test.terraform.tfstate'
-        backendAzureRmAccessKey: $(tfstateKey)
+        
+        #backendAzureRmAccessKey: $(tfstateKey)
         backendAzureRmUseMsi: false
         backendAzureRmUseOidc: false
         
