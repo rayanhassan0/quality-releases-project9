@@ -181,27 +181,51 @@ stages:
 
 #--------------------------------------------#  
 # DEPLOYMENT STAGE
-#--------------------------------------------#    
-- stage: Deploy
-  jobs:
+#--------------------------------------------#   
+
+#- stage: Deploy
+#  jobs:
   #--------------------------------------------#  
   # Deploy FakeRestAPI Web App
   # ToDo: Provide <environment name> you created in your DevOps project
-  - deployment: FakeRestAPI
-    pool:
-      vmImage: 'myAgentPool'      
-    environment: 'test'   # ToDo
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: AzureWebApp@1
-            displayName: 'Deploy Azure Web App'
-            inputs:
-              azureSubscription: 'myServiceConnection'     # ToDo
-              appName: 'myApplication1-AppService'               # ToDo
-              appType: webApp
-              package: $(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip       # ToDo: Use the published zip artifact. 
+#  - deployment: FakeRestAPI
+#    pool:
+#      vmImage: 'myAgentPool'      
+#    environment: 'test'   # ToDo
+#    strategy:
+#      runOnce:
+#        deploy:
+#          steps:
+#          - task: AzureWebApp@1
+#            displayName: 'Deploy Azure Web App'
+#            inputs:
+#              azureSubscription: 'myServiceConnection'     # ToDo
+#              appName: 'myApplication1-AppService'               # ToDo
+#              appType: webApp
+#              package: $(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip       # ToDo: Use the published zip artifact. 
+- stage: Deploy
+  jobs:
+    - job: DeployFakeRestAPI
+      pool:
+        name: 'myAgentPool'   # اسم الـ agent المحلي عندك
+      steps:
+        - task: AzureWebApp@1
+          displayName: 'Deploy Azure Web App'
+          inputs:
+            azureSubscription: 'myServiceConnection'
+            appName: 'myApplication1-AppService'
+            appType: webApp
+            package: $(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip
+        
+        - task: CmdLine@2
+          inputs:
+            script: |
+              wget "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
+              tar -xf apache-jmeter-5.2.1.tgz
+              unzip -o $(Build.BuildId)-perftests.zip
+              ./apache-jmeter-5.2.1/bin/jmeter -n -t PerformanceTestSuite.jmx -j jmeter.log -f
+              cat jmeter.log
+            workingDirectory: $(Pipeline.Workspace)/drop-perftests
           #--------------------------------------------#    
           # Run JMeter test suite against the App Service
           - task: CmdLine@2
@@ -261,6 +285,7 @@ stages:
                 python3 add_remove_from_cart.py >> selenium.log
 
                 echo "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
