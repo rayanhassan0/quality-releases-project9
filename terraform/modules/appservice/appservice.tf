@@ -4,6 +4,10 @@ resource "azurerm_service_plan" "test" {
   resource_group_name = "${var.resource_group}"
   os_type             = "Linux"
   sku_name            = "F1"
+    tags = {
+    Project     = var.application_type
+    Environment = "Test"
+  }
 }
 
 resource "azurerm_linux_web_app" "test" {
@@ -17,5 +21,9 @@ resource "azurerm_linux_web_app" "test" {
   }
   site_config {
     always_on = false
+  }
+    tags = {
+    Project     = var.application_type
+    Environment = "Test"
   }
 }

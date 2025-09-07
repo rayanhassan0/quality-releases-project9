@@ -9,6 +9,10 @@ resource "azurerm_network_interface" "" {
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = ""
   }
+    tags = {
+    Project     = var.application_type
+    Environment = "Test"
+  }
 }
 
 resource "azurerm_linux_virtual_machine" "" {
@@ -31,5 +35,9 @@ resource "azurerm_linux_virtual_machine" "" {
     offer     = "UbuntuServer"
     sku       = "18.04-LTS"
     version   = "latest"
+  }
+    tags = {
+    Project     = var.application_type
+    Environment = "Test"
   }
 }

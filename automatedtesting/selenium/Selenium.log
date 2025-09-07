@@ -1,0 +1,14 @@
+2025-09-07 04:12:35,248:INFO:Starting the browser...
+2025-09-07 04:12:46,151:INFO:Browser started successfully. Navigating to the demo page.
+2025-09-07 04:12:51,037:INFO:Login attempted with user: standard_user
+2025-09-07 04:12:51,037:INFO:Login script finished successfully.
+2025-09-07 04:13:00,928:INFO:Starting the browser...
+2025-09-07 04:13:02,172:INFO:Browser started successfully. Navigating to the demo page.
+2025-09-07 04:13:06,534:INFO:Login attempted with user: standard_user
+2025-09-07 04:13:06,534:INFO:Starting Add/Remove from Cart test.
+2025-09-07 04:13:06,628:INFO:Added item to cart: add-to-cart-sauce-labs-backpack
+2025-09-07 04:13:06,694:INFO:Added item to cart: add-to-cart-sauce-labs-bike-light
+2025-09-07 04:13:06,766:INFO:Added item to cart: add-to-cart-sauce-labs-bolt-t-shirt
+2025-09-07 04:13:06,831:INFO:Added item to cart: add-to-cart-sauce-labs-fleece-jacket
+2025-09-07 04:13:06,902:INFO:Added item to cart: add-to-cart-sauce-labs-onesie
+2025-09-07 04:13:06,967:INFO:Added item to cart: add-to-cart-test.allthethings()-t-shirt-(red)

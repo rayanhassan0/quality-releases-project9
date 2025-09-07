@@ -1,0 +1,8 @@
+Starting the browser...
+Browser started successfully.
+Navigated to login page.
+Logged in successfully.
+Inventory page loaded.
+Item add-to-cart-sauce-labs-backpack added to cart.
+Item add-to-cart-sauce-labs-backpack removed from cart.
+Browser closed.

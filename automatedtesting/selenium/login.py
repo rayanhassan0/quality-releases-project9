@@ -1,19 +1,27 @@
-# #!/usr/bin/env python
+#!/usr/bin/env python
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+# Start the browser
+print('Starting the browser...')
+driver = webdriver.Chrome()
+print('Browser started successfully.')
 
 
-# Start the browser and login with standard_user
-def login (user, password):
-    print ('Starting the browser...')
-    # --uncomment when running in Azure DevOps.
-    # options = ChromeOptions()
-    # options.add_argument("--headless") 
-    # driver = webdriver.Chrome(options=options)
-    driver = webdriver.Chrome()
-    print ('Browser started successfully. Navigating to the demo page to login.')
-    driver.get('https://www.saucedemo.com/')
+driver.get('https://www.saucedemo.com/')
+print('Navigated to login page.')
 
-login('standard_user', 'secret_sauce')
 
-# ToDo: Add more functional UI tests as per your requirements. 
+driver.find_element(By.ID, "user-name").send_keys("standard_user")
+driver.find_element(By.ID, "password").send_keys("secret_sauce")
+
+
+driver.find_element(By.ID, "login-button").click()
+print('Logged in successfully.')
+
+
+wait = WebDriverWait(driver, 10)
+wait.until(EC.presence_of_element_located((By.CLASS_NAME, "inventory_list")))
+print('Inventory page loaded.')
