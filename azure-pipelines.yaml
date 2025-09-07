@@ -31,14 +31,14 @@ stages:
     #--------------------------------------------#  
     # Use Terraform to create the Infrastructure      
     # Install Terraform on the pipeline agent 
-    #- task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+      displayName: 'Terrafom installation'
+      inputs:
+        terraformVersion: '1.13.1'
+    #- task: UseTerraform@0
       #displayName: 'Terrafom installation'
       #inputs:
-        #terraformVersion: '1.5.7'
-    - task: UseTerraform@0
-     displayName: 'Use local Terraform'
-     inputs:
-        terraformPath: 'G:\All\Azure\myagent\vsts-agent-win-x64-4.260.0\_work\_tool\terraform\1.13.1\terraform.exe'  
+        #terraformPath: 'G:\All\Azure\myagent\vsts-agent-win-x64-4.260.0\_work\_tool\terraform\1.13.1\terraform.exe'  
     
     # Run Terraform Init on the pipeline agent 
     # ToDo: Replace the resource group name, storage account name, and container name below
