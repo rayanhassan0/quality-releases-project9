@@ -39,7 +39,7 @@ stages:
     # Run Terraform Init on the pipeline agent 
     # ToDo: Replace the resource group name, storage account name, and container name below
    # ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV4@4
-    - task:  ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTask34@3
+    - task:  ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
       displayName: 'Terrafom init'
       inputs:
         provider: 'azurerm'
@@ -257,6 +257,7 @@ stages:
                 python3 add_remove_from_cart.py >> selenium.log
 
                 echo "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
