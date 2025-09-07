@@ -53,8 +53,8 @@ stages:
         backendAzureRmKey: 'test.terraform.tfstate'
         
         #backendAzureRmAccessKey: $(tfstateKey)
-        backendAzureRmUseMsi: false
-        backendAzureRmUseOidc: false
+        #backendAzureRmUseMsi: false
+        #backendAzureRmUseOidc: false
         
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
       displayName: Terraform validate
