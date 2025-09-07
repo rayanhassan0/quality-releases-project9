@@ -206,7 +206,7 @@ stages:
 
           #--------------------------------------------#    
           # Run JMeter test suite against the App Service
-          - task: CmdLine@2
+          - task: Bash@3
             inputs:
               script: |
                 wget "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
@@ -223,6 +223,8 @@ stages:
     displayName: Selenium Tests
     environment:
       name: 'test'        # ToDo: Change/provide a name
+    pool:
+      name: 'myAgentPool'
       resourceType: VirtualMachine
       tags: selenium
     strategy:
@@ -232,37 +234,31 @@ stages:
           - download: current
             artifact: drop-uitests     # ToDo: Change/provide a name
             
-          - task: Bash@3
+          - task: PowerShell@2
             inputs:
               targetType: 'inline'
               script: |           
-                #! /bin/bash
-                
-                sudo apt-get upgrade -y
-                sudo apt-get install python3-pip -y
-                sudo apt-get install unzip -y
-                sudo apt-get install -y chromium-browser
-                pip3 install selenium
-                cd ~/
-                DIR=/home/testuser/app
-                if [ ! -d "$DIR" ]; then
-                    mkdir app
-                fi
-                mv /home/testuser/azagent/_work/1/drop-uitests/$(Build.BuildId)-uitests.zip app
-                cd app
-                unzip -o $(Build.BuildId)-uitests.zip
-                FILE=/home/testuser/app/chromedriver_linux64.zip
-                if [ ! -f "$FILE" ]; then
-                    LATEST=$(wget -q -O - http://chromedriver.storage.googleapis.com/LATEST_RELEASE)
-                    wget http://chromedriver.storage.googleapis.com/$LATEST/chromedriver_linux64.zip
-                    unzip -o chromedriver_linux64.zip
-                    sudo ln -s $PWD/chromedriver /usr/local/bin/chromedriver
-                fi
-                export PATH=$PATH:/home/testuser/app
-                echo "Starting Selenium Tests"
-                python3 add_remove_from_cart.py >> selenium.log
+                Write-Host "Installing dependencies..."
+                pip install selenium
 
-                echo "Completed Selenium Tests. Check selenium.log for results."
+                Write-Host "Preparing test files..."
+                Expand-Archive "$(Pipeline.Workspace)\drop-uitests\$(Build.BuildId)-uitests.zip" -DestinationPath "$(Pipeline.Workspace)\uitests" -Force
+
+                Write-Host "Checking ChromeDriver..."
+                $chromeDriverZip = "$(Pipeline.Workspace)\uitests\chromedriver_win32.zip"
+                if (-Not (Test-Path $chromeDriverZip)) {
+                    $latest = Invoke-RestMethod "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"
+                    Invoke-WebRequest "https://chromedriver.storage.googleapis.com/$latest/chromedriver_win32.zip" -OutFile $chromeDriverZip
+                }
+                Expand-Archive $chromeDriverZip -DestinationPath "$(Pipeline.Workspace)\uitests" -Force
+                $env:PATH += ";$(Pipeline.Workspace)\uitests"
+
+                Write-Host "Running Selenium tests..."
+                cd "$(Pipeline.Workspace)\uitests"
+                python add_remove_from_cart.py | Tee-Object -FilePath selenium.log
+
+                Write-Host "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
