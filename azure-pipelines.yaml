@@ -19,6 +19,7 @@ variables:
   # Environment name
   environmentName: 'test'
 
+
 stages:
 #--------------------------------------------#  
 # BUILD STAGE
@@ -49,7 +50,7 @@ stages:
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: 'test.terraform.tfstate'
         backendAzureRmUseMsi: false
-        backendAzureRmAccessKey: 'XzHLxUBOov7hoWUr6skzLAym83gOsCWjiH+ImVKAp56ti7uDKKw5XccWZo3LQwAfu20wMbkzrc8a+ASt8Ucu7w=='
+        backendAzureRmAccessKey: $(tfstateKey)
 
         
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
