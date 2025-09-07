@@ -49,7 +49,6 @@ stages:
         backendAzureRmStorageAccountName: 'tfstateacct2025new'
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: 'test.terraform.tfstate'
-        backendAzureRmUseMsi: false
         backendAzureRmAccessKey: $(tfstateKey)
 
         
@@ -255,4 +254,5 @@ stages:
                 python3 add_remove_from_cart.py >> selenium.log
 
                 echo "Completed Selenium Tests. Check selenium.log for results."
+
 
