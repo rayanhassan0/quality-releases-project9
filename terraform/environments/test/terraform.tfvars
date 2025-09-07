@@ -7,12 +7,13 @@ tenant_id = "defd7480-7b38-4ae4-930a-8c6360058c87"
 # Resource Group/Location
 location = "centralus"
 resource_group = "Azuredevops1-test-new"
-application_type = "myApplication1"
+application_type = "myApplication1-20250907"
 
 # Network
 virtual_network_name = "vnet-myapp"
 address_space = ["10.5.0.0/16"]
 address_prefix_test = "10.5.1.0/24"
+
 
 
 
