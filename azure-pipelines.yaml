@@ -48,7 +48,9 @@ stages:
         backendAzureRmStorageAccountName: 'tfstateacct2025new'
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: 'test.terraform.tfstate'
-
+        backendAzureRmAccessKey: 'XzHLxUBOov7hoWUr6skzLAym83gOsCWjiH+ImVKAp56ti7uDKKw5XccWZo3LQwAfu20wMbkzrc8a+ASt8Ucu7w=='
+        backendAzureRmUseMsi: false
+        
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
       displayName: Terraform validate
       inputs:
@@ -189,7 +191,7 @@ stages:
             displayName: 'Deploy Azure Web App'
             inputs:
               azureSubscription: 'myServiceConnection'     # ToDo
-              appName: 'myApplication1-NewApp'               # ToDo
+              appName: 'myApplication1-AppService'               # ToDo
               appType: webApp
               package: $(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip       # ToDo: Use the published zip artifact. 
           #--------------------------------------------#    
@@ -251,3 +253,4 @@ stages:
                 python3 add_remove_from_cart.py >> selenium.log
 
                 echo "Completed Selenium Tests. Check selenium.log for results."
+
