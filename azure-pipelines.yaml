@@ -107,7 +107,7 @@ stages:
     - task: CmdLine@2
       displayName: Install Newman
       inputs:
-        script: 'sudo npm install -g newman'
+        script: 'npm install -g newman'
         workingDirectory: $(System.DefaultWorkingDirectory)
     # Postman Data Validation Test Suite    
     # ToDo: Verify the working directory
@@ -189,7 +189,7 @@ stages:
   # ToDo: Provide <environment name> you created in your DevOps project
   - deployment: FakeRestAPI
     pool:
-      vmImage: 'Ubuntu-18.04'      
+      vmImage: 'myAgentPool'      
     environment: 'test'   # ToDo
     strategy:
       runOnce:
@@ -261,6 +261,7 @@ stages:
                 python3 add_remove_from_cart.py >> selenium.log
 
                 echo "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
