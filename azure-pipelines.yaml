@@ -121,7 +121,7 @@ stages:
       inputs:
         testResultsFormat: 'JUnit'
         testResultsFiles: '**/TEST-*.xml'
-        searchFolder: '$(System.DefaultWorkingDirectory)/automatedtesting/postman/newman'      # ToDo
+        searchFolder: '$(System.DefaultWorkingDirectory)/automatedtesting/postman'      # ToDo
         mergeTestResults: true
         testRunTitle: 'Postman Data Validation'       # ToDo
 
