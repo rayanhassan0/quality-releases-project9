@@ -48,8 +48,9 @@ stages:
         backendAzureRmStorageAccountName: 'tfstateacct2025new'
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: 'test.terraform.tfstate'
-        backendAzureRmAccessKey: 'XzHLxUBOov7hoWUr6skzLAym83gOsCWjiH+ImVKAp56ti7uDKKw5XccWZo3LQwAfu20wMbkzrc8a+ASt8Ucu7w=='
         backendAzureRmUseMsi: false
+        backendAzureRmAccessKey: 'XzHLxUBOov7hoWUr6skzLAym83gOsCWjiH+ImVKAp56ti7uDKKw5XccWZo3LQwAfu20wMbkzrc8a+ASt8Ucu7w=='
+
         
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
       displayName: Terraform validate
