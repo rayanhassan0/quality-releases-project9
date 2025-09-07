@@ -44,7 +44,7 @@ stages:
       inputs:
         provider: 'azurerm'
         command: 'init'
-        backendServiceArm: 'myServiceConnection'
+        backendServiceArm: 'myServiceConnection-sp'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
         #backendServiceArm: '$(azureServiceConnectionId)'
         backendAzureRmResourceGroupName: 'Azuredevops1-test'
@@ -52,7 +52,7 @@ stages:
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: 'test.terraform.tfstate'
         backendAzureRmUseOidc: true
-
+        backendAzureRmUseMsi: false
 
         
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
@@ -257,6 +257,7 @@ stages:
                 python3 add_remove_from_cart.py >> selenium.log
 
                 echo "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
