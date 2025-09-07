@@ -35,7 +35,7 @@ stages:
       #displayName: 'Terrafom installation'
       #inputs:
         #terraformVersion: '1.5.7'
-    -task: UseTerraform@0
+    - task: UseTerraform@0
      displayName: 'Use local Terraform'
      inputs:
         terraformPath: 'G:\All\Azure\myagent\vsts-agent-win-x64-4.260.0\_work\_tool\terraform\1.13.1\terraform.exe'  
@@ -43,7 +43,7 @@ stages:
     # Run Terraform Init on the pipeline agent 
     # ToDo: Replace the resource group name, storage account name, and container name below
    # ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV4@4
-    - task:  ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
+    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
       displayName: 'Terrafom init'
       inputs:
         provider: 'azurerm'
