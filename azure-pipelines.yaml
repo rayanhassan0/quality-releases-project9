@@ -206,23 +206,29 @@ stages:
 
           #--------------------------------------------#    
           # Run JMeter test suite against the App Service
-          - task: Bash@3
+          - task: PowerShell@2
             inputs:
               bashPath: 'C:\Program Files\Git\git-bash.exe'
               script: |
-                WORKSPACE=$(cygpath "$(Pipeline.Workspace)")
-                mkdir -p "$WORKSPACE/drop-perftests"
-                cd "$WORKSPACE/drop-perftests"
-                wget "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
-                tar -xf apache-jmeter-5.2.1.tgz
-                if [ -f "$WORKSPACE/$(Build.BuildId)-perftests.zip" ]; then
-                    unzip -o "$WORKSPACE/$(Build.BuildId)-perftests.zip"
-                else
-                    echo "ERROR: zip file not found: $WORKSPACE/$(Build.BuildId)-perftests.zip"
+                $perfFolder = "$(Pipeline.Workspace)\drop-perftests"
+                if (-Not (Test-Path $perfFolder)) {
+                    New-Item -ItemType Directory -Path $perfFolder | Out-Null
+                }
+                Set-Location $perfFolder
+                $jmeterUrl = "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
+                $jmeterTgz = "$perfFolder\apache-jmeter-5.2.1.tgz"
+                Invoke-WebRequest -Uri $jmeterUrl -OutFile $jmeterTgz
+                tar -xf $jmeterTgz
+                $zipFile = "$(Pipeline.Workspace)\$(Build.BuildId)-perftests.zip"
+                if (Test-Path $zipFile) {
+                    Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force
+                } else {
+                    Write-Error "Zip file not found: $zipFile"
                     exit 1
-                fi
-                ./apache-jmeter-5.2.1/bin/jmeter -n -t PerformanceTestSuite.jmx -j jmeter.log -f
-                cat jmeter.log
+                }
+                $jmeterExe = "$perfFolder\apache-jmeter-5.2.1\bin\jmeter.bat"
+                & $jmeterExe -n -t "$perfFolder\PerformanceTestSuite.jmx" -j "$perfFolder\jmeter.log" -f
+                Get-Content "$perfFolder\jmeter.log"
               
   #--------------------------------------------#  
   # Selenium | Functional UI Tests
@@ -269,6 +275,7 @@ stages:
                 python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
           
                 Write-Host "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
