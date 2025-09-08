@@ -208,27 +208,49 @@ stages:
           # Run JMeter test suite against the App Service
           - task: PowerShell@2
             inputs:
-              bashPath: 'C:\Program Files\Git\git-bash.exe'
+              targetType: 'inline'  # مهم جداً لتشغيل script مباشرة
               script: |
-                $perfFolder = "$(Pipeline.Workspace)\drop-perftests"
+                # تحديد مجلد الأداء
+                $perfFolder = Join-Path "$(Pipeline.Workspace)" "drop-perftests"
+          
+                # إنشاء المجلد إذا لم يكن موجوداً
                 if (-Not (Test-Path $perfFolder)) {
                     New-Item -ItemType Directory -Path $perfFolder | Out-Null
                 }
+          
                 Set-Location $perfFolder
-                $jmeterUrl = "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
-                $jmeterTgz = "$perfFolder\apache-jmeter-5.2.1.tgz"
+          
+                # تحميل JMeter
+                $jmeterUrl = "https://apache.mirrors.lucidnetworks.net/jmeter/binaries/apache-jmeter-5.2.1.tgz"
+                $jmeterTgz = Join-Path $perfFolder "apache-jmeter-5.2.1.tgz"
                 Invoke-WebRequest -Uri $jmeterUrl -OutFile $jmeterTgz
+          
+                # استخراج TGZ
                 tar -xf $jmeterTgz
-                $zipFile = "$(Pipeline.Workspace)\$(Build.BuildId)-perftests.zip"
+          
+                # فك الضغط عن ZIP الخاص بالاختبارات
+                $zipFile = Join-Path "$(Pipeline.Workspace)" "$(Build.BuildId)-perftests.zip"
                 if (Test-Path $zipFile) {
                     Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force
                 } else {
                     Write-Error "Zip file not found: $zipFile"
                     exit 1
                 }
-                $jmeterExe = "$perfFolder\apache-jmeter-5.2.1\bin\jmeter.bat"
-                & $jmeterExe -n -t "$perfFolder\PerformanceTestSuite.jmx" -j "$perfFolder\jmeter.log" -f
-                Get-Content "$perfFolder\jmeter.log"
+          
+                # تشغيل JMeter
+                $jmeterExe = Join-Path $perfFolder "apache-jmeter-5.2.1\bin\jmeter.bat"
+                $jmxFile = Join-Path $perfFolder "PerformanceTestSuite.jmx"
+                $logFile = Join-Path $perfFolder "jmeter.log"
+          
+                if (-Not (Test-Path $jmxFile)) {
+                    Write-Error "JMeter test file not found: $jmxFile"
+                    exit 1
+                }
+          
+                & $jmeterExe -n -t $jmxFile -j $logFile -f
+          
+                # عرض اللوج
+                Get-Content $logFile
               
   #--------------------------------------------#  
   # Selenium | Functional UI Tests
@@ -275,6 +297,7 @@ stages:
                 python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
           
                 Write-Host "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
