@@ -220,7 +220,7 @@ stages:
                 $jmeterTgz = Join-Path $perfFolder "apache-jmeter-5.2.1.tgz"
                 Invoke-WebRequest -Uri $jmeterUrl -OutFile $jmeterTgz
                 tar -xf $jmeterTgz
-                $zipFile = Join-Path "$(Pipeline.Workspace)" "$(Build.BuildId)-perftests.zip"
+                $zipFile = Join-Path "$(Pipeline.Workspace)\drop-perftests" "$(Build.BuildId)-perftests.zip"
                 if (Test-Path $zipFile) {
                     Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force
                 } else {
@@ -282,6 +282,7 @@ stages:
                 python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
           
                 Write-Host "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
