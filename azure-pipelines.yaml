@@ -206,7 +206,7 @@ stages:
 
           #--------------------------------------------#    
           # Run JMeter test suite against the App Service
-          - task: Bash@3
+          - task: PowerShell@2
             inputs:
               script: |
                 wget "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
@@ -235,29 +235,32 @@ stages:
             artifact: drop-uitests     # ToDo: Change/provide a name
             
           - task: PowerShell@2
+            displayName: 'Run Selenium Tests on Windows'
             inputs:
               targetType: 'inline'
-              script: |           
+              script: |
                 Write-Host "Installing dependencies..."
                 pip install selenium
-
+          
                 Write-Host "Preparing test files..."
-                Expand-Archive "$(Pipeline.Workspace)\drop-uitests\$(Build.BuildId)-uitests.zip" -DestinationPath "$(Pipeline.Workspace)\uitests" -Force
-
+                $testFolder = "$(Pipeline.Workspace)\uitests"
+                Expand-Archive "$(Pipeline.Workspace)\drop-uitests\$(Build.BuildId)-uitests.zip" -DestinationPath $testFolder -Force
+          
                 Write-Host "Checking ChromeDriver..."
-                $chromeDriverZip = "$(Pipeline.Workspace)\uitests\chromedriver_win32.zip"
-                if (-Not (Test-Path $chromeDriverZip)) {
+                $chromeDriverPath = "C:\Users\adeb\Downloads\chrome-win64\chrome-win64"
+                if (-Not (Test-Path "$chromeDriverPath\chromedriver.exe")) {
                     $latest = Invoke-RestMethod "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"
+                    $chromeDriverZip = "$testFolder\chromedriver_win32.zip"
                     Invoke-WebRequest "https://chromedriver.storage.googleapis.com/$latest/chromedriver_win32.zip" -OutFile $chromeDriverZip
+                    Expand-Archive $chromeDriverZip -DestinationPath $testFolder -Force
                 }
-                Expand-Archive $chromeDriverZip -DestinationPath "$(Pipeline.Workspace)\uitests" -Force
-                $env:PATH += ";$(Pipeline.Workspace)\uitests"
-
+                $env:PATH += ";$chromeDriverPath;$testFolder"
+          
                 Write-Host "Running Selenium tests..."
-                cd "$(Pipeline.Workspace)\uitests"
-                python add_remove_from_cart.py | Tee-Object -FilePath selenium.log
-
+                python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
+          
                 Write-Host "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
