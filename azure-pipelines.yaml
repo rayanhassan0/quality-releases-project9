@@ -210,21 +210,18 @@ stages:
             inputs:
               bashPath: 'C:\Program Files\Git\git-bash.exe'
               script: |
-
-                mkdir -p "$(Pipeline.Workspace)/drop-perftests"
-                cd "$(Pipeline.Workspace)/drop-perftests"
-          
-
+                WORKSPACE=$(cygpath "$(Pipeline.Workspace)")
+                mkdir -p "$WORKSPACE/drop-perftests"
+                cd "$WORKSPACE/drop-perftests"
                 wget "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
                 tar -xf apache-jmeter-5.2.1.tgz
-          
-
-                unzip -o $(Build.BuildId)-perftests.zip
-          
-
+                if [ -f "$WORKSPACE/$(Build.BuildId)-perftests.zip" ]; then
+                    unzip -o "$WORKSPACE/$(Build.BuildId)-perftests.zip"
+                else
+                    echo "ERROR: zip file not found: $WORKSPACE/$(Build.BuildId)-perftests.zip"
+                    exit 1
+                fi
                 ./apache-jmeter-5.2.1/bin/jmeter -n -t PerformanceTestSuite.jmx -j jmeter.log -f
-          
-
                 cat jmeter.log
               
   #--------------------------------------------#  
@@ -272,6 +269,7 @@ stages:
                 python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
           
                 Write-Host "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
