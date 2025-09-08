@@ -210,12 +210,22 @@ stages:
             inputs:
               bashPath: 'C:\Program Files\Git\git-bash.exe'
               script: |
+
+                mkdir -p "$(Pipeline.Workspace)/drop-perftests"
+                cd "$(Pipeline.Workspace)/drop-perftests"
+          
+
                 wget "https://apache.mirrors.lucidnetworks.net//jmeter/binaries/apache-jmeter-5.2.1.tgz"
                 tar -xf apache-jmeter-5.2.1.tgz
+          
+
                 unzip -o $(Build.BuildId)-perftests.zip
+          
+
                 ./apache-jmeter-5.2.1/bin/jmeter -n -t PerformanceTestSuite.jmx -j jmeter.log -f
-                cat jmeter.log                                                                           # ToDo: Write your commands
-              workingDirectory: $(Pipeline.Workspace)\drop-perftests            # ToDo: Use the artifact name from the task above
+          
+
+                cat jmeter.log
               
   #--------------------------------------------#  
   # Selenium | Functional UI Tests
@@ -262,6 +272,7 @@ stages:
                 python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
           
                 Write-Host "Completed Selenium Tests. Check selenium.log for results."
+
 
 
 
