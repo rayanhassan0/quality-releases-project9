@@ -48,6 +48,13 @@ stages:
         scriptLocation: inlineScript
         inlineScript: |
           set -e
+          # تأكّد أن حاوية tfstate موجودة
+          az storage container create \
+            --account-name "$(backendStorageAccount)" \
+            --name "$(backendContainer)" \
+            --auth-mode login >/dev/null || true
+
+          # جيب أول مفتاح تخزين وخزّنه كمتغيّر سرّي ARM_ACCESS_KEY
           KEY=$(az storage account keys list \
                 -g "$(backendResourceGroup)" \
                 -n "$(backendStorageAccount)" \
@@ -55,39 +62,33 @@ stages:
           echo "##vso[task.setvariable variable=ARM_ACCESS_KEY;issecret=true]$KEY"
           echo "Backend key captured."
 
-    # Terraform init (باستخدام ARM_ACCESS_KEY)
-    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-      displayName: 'Terraform init'
-      inputs:
-        provider: 'azurerm'
-        command: 'init'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
-        backendServiceArm: '$(azureServiceConnectionId)'
-        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
-        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
-        backendAzureRmContainerName: '$(backendContainer)'
-        backendAzureRmKey: '$(backendKey)'
-        backendAzureRmUseOidc: false
-        backendAzureRmUseMsi: false
+    # ✅ Terraform via CLI (بدون MSI)
+    - bash: |
+        set -e
+        cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
+        terraform --version
+        terraform init \
+          -backend-config="storage_account_name=$(backendStorageAccount)" \
+          -backend-config="container_name=$(backendContainer)" \
+          -backend-config="key=$(backendKey)" \
+          -backend-config="resource_group_name=$(backendResourceGroup)"
+      displayName: 'Terraform init (CLI)'
       env:
         ARM_ACCESS_KEY: $(ARM_ACCESS_KEY)
 
-    # Terraform validate
-    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-      displayName: 'Terraform validate'
-      inputs:
-        provider: 'azurerm'
-        command: 'validate'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
+    - bash: |
+        set -e
+        cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
+        terraform validate
+      displayName: 'Terraform validate (CLI)'
 
-    # Terraform apply
-    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-      displayName: 'Terraform apply'
-      inputs:
-        provider: 'azurerm'
-        command: 'apply'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
-        environmentServiceNameAzureRM: '$(azureServiceConnectionId)'
+    - bash: |
+        set -e
+        cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
+        terraform apply -auto-approve
+      displayName: 'Terraform apply (CLI)'
+      env:
+        ARM_ACCESS_KEY: $(ARM_ACCESS_KEY)
 
     # ---------- Postman ----------
     - task: CmdLine@2
