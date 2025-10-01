@@ -81,6 +81,29 @@ stages:
         terraform validate
       displayName: 'Terraform validate (CLI)'
 
+    # ======= (جديد) استيراد الـ RG الموجود مسبقاً =======
+    - task: AzureCLI@2
+      displayName: 'Terraform import existing RG (idempotent)'
+      inputs:
+        azureSubscription: '$(azureServiceConnectionId)'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -e
+          SUB_ID=$(az account show --query id -o tsv)
+          cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
+
+          # استيراد RG باسم Azuredevops1-test-new (حسب اللوج اللي ظهر عندك)
+          terraform import -input=false \
+            'module.resource_group.azurerm_resource_group.test' \
+            "/subscriptions/${SUB_ID}/resourceGroups/Azuredevops1-test-new" || true
+
+          # عرض الحالة للاطمئنان
+          terraform state list || true
+      env:
+        ARM_ACCESS_KEY: $(ARM_ACCESS_KEY)
+    # ===============================================
+
     - bash: |
         set -e
         cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
