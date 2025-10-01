@@ -22,6 +22,10 @@ variables:
   # App Service ثابت
   fixedAppName: 'myapp-AppService-131'
 
+  # === أسماء الموارد القديمة التي ظهرت في اللوج ===
+  legacyResourceGroup: 'Azuredevops1-test-new'
+  legacyPrefix: 'myApplication1-20250907'   # أساس التسمية لكل الموارد القديمة
+
 stages:
 #--------------------------------------------#
 # BUILD STAGE
@@ -37,7 +41,7 @@ stages:
       inputs:
         terraformVersion: '1.13.1'
 
-    # احصل على Storage Account Key وفعّل الحاوية بنفس المفتاح
+    # احصل على Storage Account Key وفعّل الحاوية
     - task: AzureCLI@2
       displayName: 'Get tfstate access key'
       inputs:
@@ -51,8 +55,6 @@ stages:
                 -n "$(backendStorageAccount)" \
                 --query "[0].value" -o tsv)
           echo "##vso[task.setvariable variable=ARM_ACCESS_KEY;issecret=true]$KEY"
-
-          # أنشئ الحاوية باستخدام access key نفسه (وليس login) لتوحيد الصلاحيات
           az storage container create \
             --name "$(backendContainer)" \
             --account-name "$(backendStorageAccount)" \
@@ -60,7 +62,7 @@ stages:
             --auth-mode key >/dev/null || true
           echo "Backend key captured and container ensured."
 
-    # Terraform via CLI مع تمرير access_key صريح
+    # Terraform init + validate عبر CLI
     - bash: |
         set -e
         cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
@@ -71,39 +73,84 @@ stages:
           -backend-config="key=$(backendKey)" \
           -backend-config="resource_group_name=$(backendResourceGroup)" \
           -backend-config="access_key=${ARM_ACCESS_KEY}"
-      displayName: 'Terraform init (CLI)'
+        terraform validate
+      displayName: 'Terraform init & validate (CLI)'
       env:
         ARM_ACCESS_KEY: $(ARM_ACCESS_KEY)
 
-    - bash: |
-        set -e
-        cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
-        terraform validate
-      displayName: 'Terraform validate (CLI)'
-
-    # ======= (جديد) استيراد الـ RG الموجود مسبقاً =======
+    # ======= Auto-Import لكل الموارد الموجودة مسبقًا =======
     - task: AzureCLI@2
-      displayName: 'Terraform import existing RG (idempotent)'
+      displayName: 'Terraform auto-import existing Azure resources'
       inputs:
         azureSubscription: '$(azureServiceConnectionId)'
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
           set -e
-          SUB_ID=$(az account show --query id -o tsv)
           cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
 
-          # استيراد RG باسم Azuredevops1-test-new (حسب اللوج اللي ظهر عندك)
-          terraform import -input=false \
-            'module.resource_group.azurerm_resource_group.test' \
-            "/subscriptions/${SUB_ID}/resourceGroups/Azuredevops1-test-new" || true
+          # دالة: استورد لو مو موجود في الستيت
+          imp() {
+            local addr="$1" id="$2"
+            if terraform state show "$addr" >/dev/null 2>&1; then
+              echo "[SKIP] $addr already in state"
+            elif [ -n "$id" ]; then
+              echo "[IMPORT] $addr  <=  $id"
+              terraform import -input=false "$addr" "$id" || true
+            fi
+          }
 
-          # عرض الحالة للاطمئنان
+          SUB_ID=$(az account show --query id -o tsv)
+          RG='$(legacyResourceGroup)'
+          PFX='$(legacyPrefix)'
+
+          # RG
+          RGID="/subscriptions/${SUB_ID}/resourceGroups/${RG}"
+          imp 'module.resource_group.azurerm_resource_group.test' "$RGID"
+
+          # Service Plan
+          PLANID=$(az resource show -g "$RG" -n "${PFX}-AppService" \
+                   --resource-type Microsoft.Web/serverFarms --query id -o tsv || true)
+          imp 'module.appservice.azurerm_service_plan.test' "$PLANID"
+
+          # Web App (لو كان موجود)
+          WEBID=$(az resource show -g "$RG" -n "${PFX}-AppService" \
+                  --resource-type Microsoft.Web/sites --query id -o tsv || true)
+          imp 'module.appservice.azurerm_linux_web_app.test' "$WEBID"
+
+          # VNet
+          VNETID=$(az resource show -g "$RG" -n "${PFX}-NET" \
+                   --resource-type Microsoft.Network/virtualNetworks --query id -o tsv || true)
+          imp 'module.network.azurerm_virtual_network.test' "$VNETID"
+
+          # Subnet
+          SUBNETID=$(az network vnet subnet show -g "$RG" \
+                     --vnet-name "${PFX}-NET" -n "${PFX}-NET-sub" \
+                     --query id -o tsv || true)
+          imp 'module.network.azurerm_subnet.test' "$SUBNETID"
+
+          # NSG
+          NSGID=$(az resource show -g "$RG" -n "${PFX}-NSG" \
+                  --resource-type Microsoft.Network/networkSecurityGroups --query id -o tsv || true)
+          imp 'module.nsg-test.azurerm_network_security_group.nsg' "$NSGID"
+
+          # Association (Subnet <-> NSG) — صيغة import بـ pipe "|"
+          if [ -n "$SUBNETID" ] && [ -n "$NSGID" ]; then
+            imp 'module.nsg-test.azurerm_subnet_network_security_group_association.test' "${SUBNETID}|${NSGID}"
+          fi
+
+          # Public IP
+          PUBID=$(az resource show -g "$RG" -n "${PFX}-publicip-pubip" \
+                  --resource-type Microsoft.Network/publicIPAddresses --query id -o tsv || true)
+          imp 'module.publicip.azurerm_public_ip.test' "$PUBID"
+
+          echo "=== Current TF state ==="
           terraform state list || true
       env:
         ARM_ACCESS_KEY: $(ARM_ACCESS_KEY)
     # ===============================================
 
+    # الآن apply يمشي بدون تعارض "already exists"
     - bash: |
         set -e
         cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
@@ -224,21 +271,17 @@ stages:
                 $perfFolder = Join-Path "$(Pipeline.Workspace)" "perftests"
                 if (-Not (Test-Path $perfFolder)) { New-Item -ItemType Directory -Path $perfFolder | Out-Null }
                 Set-Location $perfFolder
-
                 $jmeterUrl = "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.2.1.tgz"
                 $jmeterTgz = Join-Path $perfFolder "apache-jmeter-5.2.1.tgz"
                 Invoke-WebRequest -Uri $jmeterUrl -OutFile $jmeterTgz
                 tar -xf $jmeterTgz
-
                 $zipFile = Join-Path "$(Pipeline.Workspace)\drop-perftests" "$(Build.BuildId)-perftests.zip"
                 if (Test-Path $zipFile) { Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force } else { Write-Error "Zip not found"; exit 1 }
-
                 $jmeterExe = Join-Path $perfFolder "apache-jmeter-5.2.1\bin\jmeter.bat"
                 $jmx1 = Join-Path $perfFolder "Starter.jmx"
                 $jmx2 = Join-Path $perfFolder "PerformanceTestSuite.jmx"
                 $jmxFile = (Test-Path $jmx1) ? $jmx1 : $jmx2
                 if (-Not (Test-Path $jmxFile)) { Write-Error "JMX not found"; exit 1 }
-
                 $logFile = Join-Path $perfFolder "jmeter.log"
                 & $jmeterExe -n -t $jmxFile -j $logFile -f
                 Get-Content $logFile -Tail 200
