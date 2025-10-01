@@ -3,7 +3,6 @@ name: Azure Pipelines
 trigger:
 - main
 
-# استخدم نفس الـ Agent Pool حقّك
 pool:
   name: myAgentPool
 
@@ -20,7 +19,7 @@ variables:
   backendContainer: 'tfstate'
   backendKey: 'test.terraform.tfstate'
 
-  # اسم الـ App Service الثابت اللي عندك في Azure
+  # App Service ثابت
   fixedAppName: 'myapp-AppService-131'
 
 stages:
@@ -33,13 +32,12 @@ stages:
   - job: BuildInfrastructure
     displayName: 'Terraform + Postman + Packaging'
     steps:
-    # Install Terraform
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
       displayName: 'Terraform installation'
       inputs:
         terraformVersion: '1.13.1'
 
-    # احصل على Storage Account Key وضعه في ARM_ACCESS_KEY (حلّ 403)
+    # احصل على Storage Account Key وفعّل الحاوية بنفس المفتاح
     - task: AzureCLI@2
       displayName: 'Get tfstate access key'
       inputs:
@@ -48,21 +46,21 @@ stages:
         scriptLocation: inlineScript
         inlineScript: |
           set -e
-          # تأكّد أن حاوية tfstate موجودة
-          az storage container create \
-            --account-name "$(backendStorageAccount)" \
-            --name "$(backendContainer)" \
-            --auth-mode login >/dev/null || true
-
-          # جيب أول مفتاح تخزين وخزّنه كمتغيّر سرّي ARM_ACCESS_KEY
           KEY=$(az storage account keys list \
                 -g "$(backendResourceGroup)" \
                 -n "$(backendStorageAccount)" \
                 --query "[0].value" -o tsv)
           echo "##vso[task.setvariable variable=ARM_ACCESS_KEY;issecret=true]$KEY"
-          echo "Backend key captured."
 
-    # ✅ Terraform via CLI (بدون MSI)
+          # أنشئ الحاوية باستخدام access key نفسه (وليس login) لتوحيد الصلاحيات
+          az storage container create \
+            --name "$(backendContainer)" \
+            --account-name "$(backendStorageAccount)" \
+            --account-key "$KEY" \
+            --auth-mode key >/dev/null || true
+          echo "Backend key captured and container ensured."
+
+    # Terraform via CLI مع تمرير access_key صريح
     - bash: |
         set -e
         cd "$(System.DefaultWorkingDirectory)/terraform/environments/test"
@@ -71,7 +69,8 @@ stages:
           -backend-config="storage_account_name=$(backendStorageAccount)" \
           -backend-config="container_name=$(backendContainer)" \
           -backend-config="key=$(backendKey)" \
-          -backend-config="resource_group_name=$(backendResourceGroup)"
+          -backend-config="resource_group_name=$(backendResourceGroup)" \
+          -backend-config="access_key=${ARM_ACCESS_KEY}"
       displayName: 'Terraform init (CLI)'
       env:
         ARM_ACCESS_KEY: $(ARM_ACCESS_KEY)
@@ -163,7 +162,6 @@ stages:
   displayName: Deploy
   dependsOn: Build
   jobs:
-  # ---------- Deploy App Service ----------
   - deployment: FakeRestAPI
     displayName: 'Deploy FakeRestAPI Web App'
     pool:
@@ -173,7 +171,6 @@ stages:
       runOnce:
         deploy:
           steps:
-          # إعداد runtime & logging (يربط RG بالمتغيّر بدل الثابت)
           - task: AzureCLI@2
             displayName: 'Pre-config runtime & logging'
             inputs:
@@ -196,7 +193,6 @@ stages:
               appName: '$(fixedAppName)'
               package: '$(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip'
 
-          # ---------- JMeter على Windows agent ----------
           - task: PowerShell@2
             displayName: 'Run JMeter against App Service'
             inputs:
@@ -212,12 +208,7 @@ stages:
                 tar -xf $jmeterTgz
 
                 $zipFile = Join-Path "$(Pipeline.Workspace)\drop-perftests" "$(Build.BuildId)-perftests.zip"
-                if (Test-Path $zipFile) {
-                  Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force
-                } else {
-                  Write-Error "Zip file not found: $zipFile"
-                  exit 1
-                }
+                if (Test-Path $zipFile) { Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force } else { Write-Error "Zip not found"; exit 1 }
 
                 $jmeterExe = Join-Path $perfFolder "apache-jmeter-5.2.1\bin\jmeter.bat"
                 $jmx1 = Join-Path $perfFolder "Starter.jmx"
@@ -227,10 +218,8 @@ stages:
 
                 $logFile = Join-Path $perfFolder "jmeter.log"
                 & $jmeterExe -n -t $jmxFile -j $logFile -f
-                Write-Host "=== JMeter Log (tail) ==="
                 Get-Content $logFile -Tail 200
 
-  # ---------- Selenium على Windows VM ----------
   - deployment: VMDeploy
     displayName: 'Selenium Tests'
     environment:
@@ -253,25 +242,17 @@ stages:
               script: |
                 Write-Host "Installing dependencies..."
                 pip install selenium
-
-                Write-Host "Preparing test files..."
                 $testFolder = "$(Pipeline.Workspace)\uitests"
                 if (-Not (Test-Path $testFolder)) { New-Item -ItemType Directory -Path $testFolder | Out-Null }
                 Expand-Archive "$(Pipeline.Workspace)\drop-uitests\$(Build.BuildId)-uitests.zip" -DestinationPath $testFolder -Force
-
-                Write-Host "Checking ChromeDriver..."
                 $chromeDriverPath = "C:\Users\Public\chromedriver\chromedriver.exe"
                 if (-Not (Test-Path $chromeDriverPath)) {
-                    $latest = Invoke-RestMethod "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"
-                    $chromeDriverZip = "$testFolder\chromedriver_win32.zip"
-                    Invoke-WebRequest "https://chromedriver.storage.googleapis.com/$latest/chromedriver_win32.zip" -OutFile $chromeDriverZip
-                    New-Item -ItemType Directory -Path (Split-Path $chromeDriverPath) -Force | Out-Null
-                    Expand-Archive $chromeDriverZip -DestinationPath (Split-Path $chromeDriverPath) -Force
+                  $latest = Invoke-RestMethod "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"
+                  $zip = "$testFolder\chromedriver_win32.zip"
+                  Invoke-WebRequest "https://chromedriver.storage.googleapis.com/$latest/chromedriver_win32.zip" -OutFile $zip
+                  New-Item -ItemType Directory -Path (Split-Path $chromeDriverPath) -Force | Out-Null
+                  Expand-Archive $zip -DestinationPath (Split-Path $chromeDriverPath) -Force
                 }
-                $chromeDriverDir = Split-Path $chromeDriverPath
-                $env:PATH += ";$chromeDriverDir;$testFolder"
-
-                Write-Host "Running Selenium tests..."
+                $env:PATH += ";" + (Split-Path $chromeDriverPath) + ";$testFolder"
                 python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
-
-                Write-Host "Completed Selenium Tests. Check selenium.log for results."
+                Write-Host "Completed Selenium Tests."
