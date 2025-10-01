@@ -1,158 +1,120 @@
 name: Azure Pipelines
 
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
 trigger:
 - main
 
-# ToDo: Replace the agent pool name, if you are using Udacity Cloud lab. 
-# Otherwise, comment out the line below. 
-pool: myAgentPool
+# استخدم نفس الـ Agent Pool حقّك
+pool:
+  name: myAgentPool
 
 variables:
+  # === أساسيات ===
   python.version: '3.7.6'
-  # ToDo: Replace the service connection name as used in the DevOps project settings
-  azureServiceConnectionId: 'myServiceConnection'
-  # Project root folder. Point to the folder containing manage.py file.
-  projectRoot: $(System.DefaultWorkingDirectory)
-  # Environment name
+  azureServiceConnectionId: 'udacity-az-sp'                 # كانت myServiceConnection
+  projectRoot: '$(System.DefaultWorkingDirectory)'
   environmentName: 'test'
 
+  # === Terraform backend (مطابق للي كنت تستخدمه قبل) ===
+  backendResourceGroup: 'Azuredevops'
+  backendStorageAccount: 'tfstatebootstrap01'
+  backendContainer: 'tfstate'
+  backendKey: 'test.terraform.tfstate'
+
+  # اسم الـ App Service الثابت اللي عندك في Azure
+  fixedAppName: 'myapp-AppService-131'
 
 stages:
-#--------------------------------------------#  
+#--------------------------------------------#
 # BUILD STAGE
-#--------------------------------------------#    
+#--------------------------------------------#
 - stage: Build
+  displayName: Build
   jobs:
   - job: BuildInfrastructure
+    displayName: 'Terraform + Postman + Packaging'
     steps:
-    #--------------------------------------------#  
-    # Use Terraform to create the Infrastructure      
-    # Install Terraform on the pipeline agent 
+    # Install Terraform
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
-      displayName: 'Terrafom installation'
+      displayName: 'Terraform installation'
       inputs:
         terraformVersion: '1.13.1'
-    #- task: UseTerraform@0
-      #displayName: 'Terrafom installation'
-      #inputs:
-        #terraformPath: 'G:\All\Azure\myagent\vsts-agent-win-x64-4.260.0\_work\_tool\terraform\1.13.1\terraform.exe'  
-    
-    # Run Terraform Init on the pipeline agent 
-    # ToDo: Replace the resource group name, storage account name, and container name below
-   # ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV4@4
+
+    # Terraform init (على نفس backend السابق)
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-      displayName: 'Terrafom init'
+      displayName: 'Terraform init'
       inputs:
         provider: 'azurerm'
         command: 'init'
-        #backendServiceArm: 'myServiceConnection-sp1'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
         backendServiceArm: '$(azureServiceConnectionId)'
-        backendAzureRmResourceGroupName: 'Azuredevops1-test'
-        backendAzureRmStorageAccountName: 'tfstateacct2025new'
-        backendAzureRmContainerName: 'tfstate'
-        backendAzureRmKey: 'test.terraform.tfstate'
+        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+        backendAzureRmContainerName: '$(backendContainer)'
+        backendAzureRmKey: '$(backendKey)'
         backendAzureRmUseOidc: false
         backendAzureRmUseMsi: false
 
-        
+    # Terraform validate
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-      displayName: Terraform validate
+      displayName: 'Terraform validate'
       inputs:
         provider: 'azurerm'
         command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
 
-    # OPTIONAL - This step is needed only if your Terraform VM uses an SSH key pair for login and you want your pipeline agent to connect to it. 
-    # Generate an SSH key pair in your local/AZ Cloud shell. Use the public key in the Terraform VM module. 
-    # Install public key and private key file to the pipeline agent, using the task below. 
-    # ToDo: Change the inputs value below
-    # - task: InstallSSHKey@0
-    #   inputs:
-    #     knownHostsEntry: 'KNOWN_HOSTS_STRING' # variable value
-    #     sshPublicKey: 'PUBLIC_KEY'            # variable value
-    #     sshKeySecureFile: 'id_rsa' # Use secure file feature in the pipeline library UI to save the "id_rsa" file, as mentioned here: https://learn.microsoft.com/en-us/azure/devops/pipelines/library/secure-files?view=azure-devops#add-a-secure-file
-    
-    # - task: DownloadSecureFile@1
-    #  name: udacity_public_key
-    #  displayName: 
-    #  inputs:
-    #   secureFile: 
-
-    
-    # Run Terraform Apply
+    # Terraform apply
     - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-      displayName: Terraform apply
+      displayName: 'Terraform apply'
       inputs:
         provider: 'azurerm'
         command: 'apply'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
         environmentServiceNameAzureRM: '$(azureServiceConnectionId)'
 
-    # ToDo: Change the workingDirectory path, as applicable to you
-    # Destroy the resources in Azure by running a separate pipeline. 
-    # - task: TerraformTaskV3@3
-    #   displayName: Terraform destroy
-    #   inputs:
-    #     provider: 'azurerm'
-    #     command: 'destroy'
-    #     workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
-    #     environmentServiceNameAzureRM: '$(azureServiceConnectionId)'
-
-#--------------------------------------------#    
-    # Postman - Install Newman    
-    # ToDo: Update the command and verify the working directory
+    # ---------- Postman ----------
     - task: CmdLine@2
-      displayName: Install Newman
+      displayName: 'Install Newman'
       inputs:
         script: 'npm install -g newman'
-        workingDirectory: $(System.DefaultWorkingDirectory)
-    # Postman Data Validation Test Suite    
-    # ToDo: Verify the working directory
+        workingDirectory: '$(System.DefaultWorkingDirectory)'
+
     - task: CmdLine@2
-      displayName: Run Data Validation Tests
+      displayName: 'Run Data Validation Tests'
       continueOnError: true
       inputs:
         script: 'newman run TestSuite.Data-Validation.json -e Test.environment.json --reporters cli,junit --reporter-junit-export TEST-DataValidation.xml'
         workingDirectory: '$(System.DefaultWorkingDirectory)/automatedtesting/postman'
-    # Postman Regression Test Suite    
-    # ToDo: Verify the working directory
+
     - task: CmdLine@2
-      displayName: Run Regression Tests
+      displayName: 'Run Regression Tests'
       continueOnError: true
       inputs:
-        script: 'newman run TestSuit.Regression.json -e Test.environment.json --reporters cli,junit --reporter-junit-export TEST-Regression.xml'
+        # تصحيح اسم الملف (كان TestSuit.Regression.json)
+        script: 'newman run TestSuite.Regression.json -e Test.environment.json --reporters cli,junit --reporter-junit-export TEST-Regression.xml'
         workingDirectory: '$(System.DefaultWorkingDirectory)/automatedtesting/postman'
-    # Postman - Publish Results 
-    # ToDo: Complete the task as explained here: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/test/publish-test-results?view=azure-devops&tabs=trx%2Cyaml#yaml-snippet
+
     - task: PublishTestResults@2
+      displayName: 'Publish Postman JUnit Results'
       inputs:
         testResultsFormat: 'JUnit'
         testResultsFiles: '**/TEST-*.xml'
-        searchFolder: '$(System.DefaultWorkingDirectory)/automatedtesting/postman'      # ToDo
+        searchFolder: '$(System.DefaultWorkingDirectory)/automatedtesting/postman'
         mergeTestResults: true
-        testRunTitle: 'Postman Data Validation'       # ToDo
+        testRunTitle: 'Postman Results'
 
-    #--------------------------------------------#
-    # Selenium (UI) Test Suite - Archive the package  
-    # "ArchiveFiles@2" picks up the web package and archives it.
+    # ---------- Selenium package ----------
     - task: ArchiveFiles@2
-      displayName: 'Archive UI Tests'
+      displayName: 'Archive UI Tests (Selenium)'
       inputs:
         rootFolderOrFile: '$(System.DefaultWorkingDirectory)/automatedtesting/selenium'
         includeRootFolder: false
         archiveType: 'zip'
         archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-uitests.zip'
-    # Selenium Test Suite - Publish the package  
-    - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId)-uitests.zip   # Same as the archiveFile artifact above. 
-      displayName: 'Upload Package'
-      artifact: drop-uitests
+    - publish: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-uitests.zip'
+      displayName: 'Publish UI Tests Artifact'
+      artifact: 'drop-uitests'
 
-    #--------------------------------------------#    
-    # FakeRestAPI - Archive
-    # ToDo: Complete the ArchiveFiles@2 task and publish step 
+    # ---------- FakeRestAPI package ----------
     - task: ArchiveFiles@2
       displayName: 'Archive FakeRestAPI'
       inputs:
@@ -160,90 +122,101 @@ stages:
         includeRootFolder: false
         archiveType: 'zip'
         archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-fakerestapi.zip'
-    - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId)-fakerestapi.zip
-      displayName: 'Upload Package'
-      artifact: drop-fakerestapi
+    - publish: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-fakerestapi.zip'
+      displayName: 'Publish FakeRestAPI Artifact'
+      artifact: 'drop-fakerestapi'
 
-    #--------------------------------------------#  
-    # JMeter (Performance) Test Suite - Archive
-    # ToDo: Complete the ArchiveFiles@2 task and publish step 
+    # ---------- JMeter package ----------
     - task: ArchiveFiles@2
-      displayName: 'Archive PerformanceTestSuite'
+      displayName: 'Archive PerformanceTestSuite (JMeter)'
       inputs:
         rootFolderOrFile: '$(System.DefaultWorkingDirectory)/automatedtesting/jmeter'
         includeRootFolder: false
         archiveType: 'zip'
         archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-perftests.zip'
-    # JMeter Test Suite - Publish    
-    - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId)-perftests.zip
-      displayName: 'Upload Package'
-      artifact: drop-perftests
+    - publish: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-perftests.zip'
+      displayName: 'Publish Perf Tests Artifact'
+      artifact: 'drop-perftests'
 
-#--------------------------------------------#  
+#--------------------------------------------#
 # DEPLOYMENT STAGE
-#--------------------------------------------#   
-
+#--------------------------------------------#
 - stage: Deploy
+  displayName: Deploy
+  dependsOn: Build
   jobs:
-  #--------------------------------------------#  
-  # Deploy FakeRestAPI Web App
-  # ToDo: Provide <environment name> you created in your DevOps project
+  # ---------- Deploy App Service ----------
   - deployment: FakeRestAPI
+    displayName: 'Deploy FakeRestAPI Web App'
     pool:
-      name: 'myAgentPool'      
-    environment: 'test'   # ToDo
+      name: 'myAgentPool'
+    environment: '$(environmentName)'
     strategy:
       runOnce:
         deploy:
           steps:
-          - task: AzureWebApp@1
-            displayName: 'Deploy Azure Web App'
+          # (اختياري) إعداد الـruntime لو واجهت تحذير deprecated أو صفحة ما تفتح
+          - task: AzureCLI@2
+            displayName: 'Pre-config runtime & logging'
             inputs:
-              azureSubscription: 'myServiceConnection'     # ToDo
-              appName: 'myApplication1-AppService'               # ToDo
-              appType: webApp
-              package: $(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip       # ToDo: Use the published zip artifact. 
+              azureSubscription: '$(azureServiceConnectionId)'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -e
+                RG='Azuredevops'
+                APP='$(fixedAppName)'
+                az webapp config set -g "$RG" -n "$APP" --linux-fx-version "NODE|18-lts" || true
+                az webapp config appsettings set -g "$RG" -n "$APP" --settings WEBSITE_NODE_DEFAULT_VERSION="~18" SCM_DO_BUILD_DURING_DEPLOYMENT=true WEBSITES_PORT=3000 >/dev/null
+                az webapp log config -g "$RG" -n "$APP" --application-logging filesystem --level information --detailed-error-messages true --failed-request-tracing true >/dev/null || true
 
-          #--------------------------------------------#    
-          # Run JMeter test suite against the App Service
+          - task: AzureWebApp@1
+            displayName: 'Deploy Azure Web App (Zip)'
+            inputs:
+              azureSubscription: '$(azureServiceConnectionId)'
+              appType: webApp
+              appName: '$(fixedAppName)'   # ← اسم ثابت
+              package: '$(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip'
+
+          # ---------- JMeter على Windows agent (أسلوب قريب من كود صاحبتك) ----------
           - task: PowerShell@2
+            displayName: 'Run JMeter against App Service'
             inputs:
               targetType: 'inline'
               script: |
-                # تحديد مجلد الأداء
-                $perfFolder = Join-Path "$(Pipeline.Workspace)" "drop-perftests"
-                if (-Not (Test-Path $perfFolder)) {
-                    New-Item -ItemType Directory -Path $perfFolder | Out-Null
-                }
+                $perfFolder = Join-Path "$(Pipeline.Workspace)" "perftests"
+                if (-Not (Test-Path $perfFolder)) { New-Item -ItemType Directory -Path $perfFolder | Out-Null }
                 Set-Location $perfFolder
-                $jmeterUrl = "https://mirror.lyrahosting.com/apache/jmeter/binaries/apache-jmeter-5.2.1.tgz"
+
+                $jmeterUrl = "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.2.1.tgz"
                 $jmeterTgz = Join-Path $perfFolder "apache-jmeter-5.2.1.tgz"
                 Invoke-WebRequest -Uri $jmeterUrl -OutFile $jmeterTgz
                 tar -xf $jmeterTgz
+
                 $zipFile = Join-Path "$(Pipeline.Workspace)\drop-perftests" "$(Build.BuildId)-perftests.zip"
                 if (Test-Path $zipFile) {
-                    Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force
+                  Expand-Archive -Path $zipFile -DestinationPath $perfFolder -Force
                 } else {
-                    Write-Error "Zip file not found: $zipFile"
-                    exit 1
+                  Write-Error "Zip file not found: $zipFile"
+                  exit 1
                 }
+
                 $jmeterExe = Join-Path $perfFolder "apache-jmeter-5.2.1\bin\jmeter.bat"
-                $jmxFile = Join-Path $perfFolder "PerformanceTestSuite.jmx"
+                $jmx1 = Join-Path $perfFolder "Starter.jmx"
+                $jmx2 = Join-Path $perfFolder "PerformanceTestSuite.jmx"
+                $jmxFile = (Test-Path $jmx1) ? $jmx1 : $jmx2
+                if (-Not (Test-Path $jmxFile)) { Write-Error "JMX not found"; exit 1 }
+
                 $logFile = Join-Path $perfFolder "jmeter.log"
-                if (-Not (Test-Path $jmxFile)) {
-                    Write-Error "JMeter test file not found: $jmxFile"
-                    exit 1
-                }
                 & $jmeterExe -n -t $jmxFile -j $logFile -f
-                Get-Content $logFile
-              
-  #--------------------------------------------#  
-  # Selenium | Functional UI Tests
-  # ToDo: 
+                Write-Host "=== JMeter Log (tail) ==="
+                Get-Content $logFile -Tail 200
+
+  # ---------- Selenium على Windows VM ----------
   - deployment: VMDeploy
-    displayName: Selenium Tests
+    displayName: 'Selenium Tests'
     environment:
-      name: 'test'        # ToDo: Change/provide a name
+      name: '$(environmentName)'
     pool:
       name: 'myAgentPool'
       resourceType: VirtualMachine
@@ -253,8 +226,8 @@ stages:
         deploy:
           steps:
           - download: current
-            artifact: drop-uitests     # ToDo: Change/provide a name
-            
+            artifact: drop-uitests
+
           - task: PowerShell@2
             displayName: 'Run Selenium Tests on Windows'
             inputs:
@@ -262,68 +235,25 @@ stages:
               script: |
                 Write-Host "Installing dependencies..."
                 pip install selenium
-          
+
                 Write-Host "Preparing test files..."
                 $testFolder = "$(Pipeline.Workspace)\uitests"
+                if (-Not (Test-Path $testFolder)) { New-Item -ItemType Directory -Path $testFolder | Out-Null }
                 Expand-Archive "$(Pipeline.Workspace)\drop-uitests\$(Build.BuildId)-uitests.zip" -DestinationPath $testFolder -Force
-          
+
                 Write-Host "Checking ChromeDriver..."
-                $chromeDriverPath = "C:\Users\adeb\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe"
+                $chromeDriverPath = "C:\Users\Public\chromedriver\chromedriver.exe"
                 if (-Not (Test-Path $chromeDriverPath)) {
                     $latest = Invoke-RestMethod "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"
                     $chromeDriverZip = "$testFolder\chromedriver_win32.zip"
                     Invoke-WebRequest "https://chromedriver.storage.googleapis.com/$latest/chromedriver_win32.zip" -OutFile $chromeDriverZip
-                    Expand-Archive $chromeDriverZip -DestinationPath $testFolder -Force
+                    New-Item -ItemType Directory -Path (Split-Path $chromeDriverPath) -Force | Out-Null
+                    Expand-Archive $chromeDriverZip -DestinationPath (Split-Path $chromeDriverPath) -Force
                 }
                 $chromeDriverDir = Split-Path $chromeDriverPath
                 $env:PATH += ";$chromeDriverDir;$testFolder"
-          
+
                 Write-Host "Running Selenium tests..."
                 python "$testFolder\add_remove_from_cart.py" | Tee-Object -FilePath "$testFolder\selenium.log"
-          
+
                 Write-Host "Completed Selenium Tests. Check selenium.log for results."
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
